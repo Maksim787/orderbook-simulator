@@ -1,4 +1,6 @@
 __pycache__/
-data/
 .vscode
 .idea
+cmake-build-debug/
+
+data/

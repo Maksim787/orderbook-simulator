@@ -20,7 +20,7 @@ struct Event {
     uint64_t time_microseconds;
     uint64_t order_id; // unique order id
     Action action;
-    float px;
+    double px;
 
     // action = Cancel: qty = remaining qty
     // action = Place:  qty = placed qty
@@ -29,7 +29,7 @@ struct Event {
 
     // Only for action = Trade
     uint64_t trade_id;
-    float trade_px;
+    double trade_px;
 
     void Serialize(std::ostream& out) const;
 };

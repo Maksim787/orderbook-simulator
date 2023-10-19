@@ -1,10 +1,8 @@
 #include <parsers/FileReader.h>
 #include <parsers/LineParsers.h>
-
-#include "utils.h"
+#include <utils.h>
 
 #include <iostream>
-#include <unordered_set>
 
 class EventParser {
 private:
@@ -14,13 +12,10 @@ private:
 public:
     EventParser(int n_print_lines) : n_print_lines(n_print_lines) {}
 
-    void callback(const char* data, size_t len) {
-        EventWithInstrument event = parse_line_with_sec_code(data, len);
+    void CallBack(const char* data, size_t len) {
+        auto event = parse_event_from_line<EventWithInstrument>(data, len);
         if (line_count < n_print_lines) {
             std::cout << len << ": " << std::string(data, len) << "\n";
-            std::cout << event;
-        }
-        if (event.action == Action::TRADE) {
             std::cout << event;
         }
         if (event.id != line_count + 1) {
@@ -33,9 +28,13 @@ public:
 int main() {
     const int n_print_lines = 1;
     EventParser parser(n_print_lines);
-    FileReader reader(FILENAME, [&parser](const char* data, size_t len) { parser.callback(data, len); }, MULTIPLE_INSTRUMENTS_HEADER);
+    FileReader reader(
+            MULTIPLE_INSTRUMENTS_TEST_FILENAME,
+            [&parser](const char* data, size_t len) { parser.CallBack(data, len); },
+            MULTIPLE_INSTRUMENTS_HEADER
+    );
 
-    run_reader(reader);
+    RunReaderWithTimeCheck(reader);
 
     return 0;
 }

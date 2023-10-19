@@ -1,4 +1,3 @@
-#include <parsers/LineParsers.h>
 #include <cassert>
 #include <string>
 
@@ -6,6 +5,7 @@
 #define PARSE_INT(dest) \
     do { \
         char* endPtr; \
+        errno = 0; \
         dest = strtol(data, &endPtr, 10); \
         assert(errno == 0 && "Integer conversion error"); \
         assert(endPtr != data && "Integer overflow"); \
@@ -16,6 +16,7 @@
 #define PARSE_UINT64_T(dest) \
     do { \
         char* endPtr; \
+        errno = 0; \
         dest = strtoull(data, &endPtr, 10); \
         assert(errno == 0 && "uint64_t conversion error"); \
         assert(endPtr != data && "uint64_t overflow"); \
@@ -23,14 +24,15 @@
         data = endPtr; \
     } while (0)
 
-// Macro to parse a float from the string
-#define PARSE_FLOAT(dest) \
+// Macro to parse a double from the string
+#define PARSE_DOUBLE(dest) \
     do { \
         char* endPtr; \
-        dest = strtof(data, &endPtr); \
-        assert(errno == 0 && "Float conversion error"); \
-        assert(endPtr != data && "Float overflow"); \
-        assert(endPtr <= data + len && "Float overflow"); \
+        errno = 0; \
+        dest = strtod(data, &endPtr); \
+        assert(errno == 0 && "Double conversion error"); \
+        assert(endPtr != data && "Double overflow"); \
+        assert(endPtr <= data + len && "Double overflow"); \
         data = endPtr; \
     } while (0)
 
@@ -81,6 +83,7 @@
 #define PARSE_TIME(dest) \
     do { \
         char* endPtr; \
+        errno = 0; \
         uint64_t time = strtoull(data, &endPtr, 10); \
         assert(errno == 0 && "Time overflow"); \
         assert(endPtr != data && "Time overflow"); \
@@ -91,6 +94,7 @@
         uint64_t seconds = (time / 1000000) % 100; \
         uint64_t milliseconds = (time / 1000) % 1000; \
         uint64_t microseconds = time % 1000; \
+        assert(hours <= 23); \
         dest = hours * 3600000000ull + minutes * 60000000ull + seconds * 1000000ull + milliseconds * 1000ull + microseconds; \
     } while (0)
 
@@ -98,17 +102,22 @@
     assert(*data == ',' && "Expected comma"); \
     ++data;
 
-EventWithInstrument parse_line_with_sec_code(const char* data, size_t len) {
+template <class EventType>
+EventType parse_event_from_line(const char* data, size_t len) {
+    static_assert(std::is_same_v<EventType, Event> || std::is_same_v<EventType, EventWithInstrument>);
     // 1,ABRD,B,100000000000,1,1,126,40,,
     // id,sec_code,buy/sell,time:HHMMSSZZZXXX,order_id,action:{0,1,2},px,qty,trade_id:optional,trade_px:optional
     const char* const data_start = data;
 
-    EventWithInstrument event;
+    EventType event;
     PARSE_INT(event.id);
+    assert(event.id >= 1);
     SKIP_COMMA();
 
-    PARSE_STRING(event.sec_code);
-    SKIP_COMMA();
+    if constexpr (std::is_same_v<EventType, EventWithInstrument>) {
+        PARSE_STRING(event.sec_code);
+        SKIP_COMMA();
+    }
 
     PARSE_DIRECTION(event.direction);
     SKIP_COMMA();
@@ -122,7 +131,8 @@ EventWithInstrument parse_line_with_sec_code(const char* data, size_t len) {
     PARSE_ACTION(event.action);
     SKIP_COMMA();
 
-    PARSE_FLOAT(event.px);
+    PARSE_DOUBLE(event.px);
+    assert(event.px >= 0);
     SKIP_COMMA();
 
     PARSE_INT(event.qty);
@@ -131,7 +141,8 @@ EventWithInstrument parse_line_with_sec_code(const char* data, size_t len) {
     if (event.action == Action::TRADE) {
         PARSE_UINT64_T(event.trade_id);
         SKIP_COMMA();
-        PARSE_FLOAT(event.trade_px);
+        PARSE_DOUBLE(event.trade_px);
+        assert(event.trade_px > 0);
     } else {
         SKIP_COMMA();
     }

@@ -3,19 +3,19 @@
 #include <iomanip>
 
 std::ostream& operator<<(std::ostream& os, const Event& event) {
-    os << "Event ID: " << event.id << "\n";
-    os << "Direction: " << event.direction << "\n";
-    os << "Time (microseconds): " << event.time_microseconds << "\n";
-    os << "Order ID: " << event.order_id << "\n";
-    os << "Action: " << event.action << "\n";
-    os << "Price (px): " << event.px << "\n";
-    os << "Quantity (qty): " << event.qty << "\n";
+    os << "[Event ID: " << event.id << ", ";
+    os << "Direction: " << event.direction << ", ";
+    os << "Time (microseconds): " << event.time_microseconds << ", ";
+    os << "Order ID: " << event.order_id << ", ";
+    os << "Action: " << event.action << ", ";
+    os << "Price (px): " << event.px << ", ";
+    os << "Quantity (qty): " << event.qty << ", ";
     if (event.action == Action::TRADE) {
-        os << "Trade ID: " << event.trade_id << "\n";
-        os << "Trade Price (trade_px): " << event.trade_px << "\n";
+        os << "Trade ID: " << event.trade_id << ", ";
+        os << "Trade Price (trade_px): " << event.trade_px << "]";
     } else {
-        os << "Trade ID: null\n";
-        os << "Trade Price (trade_px): null\n";
+        os << "Trade ID: null, ";
+        os << "Trade Price (trade_px): null]\n";
     }
     return os;
 }

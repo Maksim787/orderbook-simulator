@@ -2,5 +2,7 @@
 
 #include <orderbook/Event.h>
 
-EventWithInstrument parse_line_with_sec_code(const char* data, size_t len);
+template <class EventType>
+EventType parse_event_from_line(const char* data, size_t len);
 
+#include <parsers/LineParsers.hpp>

@@ -1,7 +1,6 @@
 #include <parsers/FileReader.h>
 #include <parsers/LineParsers.h>
-
-#include "utils.h"
+#include <utils.h>
 
 #include <iostream>
 #include <filesystem>
@@ -25,13 +24,27 @@ public:
     Splitter(std::string order_log_file, std::string dst_directory)
             : order_log_file(std::move(order_log_file)), dst_directory(std::move(dst_directory)) {}
 
-    std::unordered_map<std::string, InstrumentInfo>::iterator create_instrument(const char* sec_code) {
-        // Construct the instrument folder
+    void CallBack(const char* data, size_t len) {
+        auto event = parse_event_from_line<EventWithInstrument>(data, len);
+        if (event.id != line_count + 1) {
+            throw std::runtime_error("Expected ID: " + std::to_string(line_count + 1) + "; Got: " + std::to_string(event.id));
+        }
+        ++line_count;
+        auto it = file_by_instrument.find(event.sec_code);
+        if (it == file_by_instrument.end()) {
+            // Create file for instrument
+            it = CreateInstrument(event.sec_code);
+        }
+        WriteEventToFile(event, it->second);
+    }
+
+private:
+    std::unordered_map<std::string, InstrumentInfo>::iterator CreateInstrument(const char* sec_code) {
+        // Construct the instrument directory
         fs::path instrument_path = fs::path(dst_directory) / sec_code;
         if (!fs::exists(instrument_path)) {
-            errno = 0; // some bug with fs::exists
             fs::create_directory(instrument_path);
-            std::cout << "Created folder for instrument: \"" << sec_code << "\"\n";
+            std::cout << "Created directory for instrument: \"" << sec_code << "\"\n";
         }
         // Construct the order log file
         fs::path log_file = instrument_path / order_log_file;
@@ -44,38 +57,23 @@ public:
         return file_by_instrument.find(sec_code);
     }
 
-    void write_info_to_file(const EventWithInstrument& event, InstrumentInfo& info) {
+    void WriteEventToFile(const EventWithInstrument& event, InstrumentInfo& info) {
         info.file << info.curr_id << ',';
         event.Serialize(info.file);
         ++info.curr_id;
     }
-
-    void callback(const char* data, size_t len) {
-        EventWithInstrument event = parse_line_with_sec_code(data, len);
-        if (event.id != line_count + 1) {
-            throw std::runtime_error("Expected ID: " + std::to_string(line_count + 1) + "; Got: " + std::to_string(event.id));
-        }
-        ++line_count;
-        auto it = file_by_instrument.find(event.sec_code);
-        if (it == file_by_instrument.end()) {
-            // Create file for instrument
-            it = create_instrument(event.sec_code);
-        }
-        auto&[sec_code, info] = *it;
-        write_info_to_file(event, info);
-    }
 };
 
 int main() {
-    const std::string src_folder = "data/examples/SE";
-    const std::string dst_folder = src_folder + "_by_instrument";
+    const std::string src_directory = "data/examples/SE";
+    const std::string dst_directory = src_directory + "_by_instrument";
 
-    std::cout << "Source: " << src_folder << "\n";
-    std::cout << "Destination: " << dst_folder << "\n";
+    std::cout << "Source: " << src_directory << "\n";
+    std::cout << "Destination: " << dst_directory << "\n";
 
     // Read source files
     std::vector<std::string> files;
-    for (const auto& entry: fs::directory_iterator(src_folder)) {
+    for (const auto& entry: fs::directory_iterator(src_directory)) {
         assert(entry.is_regular_file());
         files.push_back(entry.path().filename().string());
     }
@@ -86,23 +84,26 @@ int main() {
         std::cout << i + 1 << ". " << files[i] << "\n";
     }
 
-    // Create destination folder
-    if (!fs::exists(dst_folder)) {
-        errno = 0; // some bug with fs::exists
-        if (!fs::create_directory(dst_folder)) {
-            throw std::runtime_error("Failed to create the destination folder: " + dst_folder);
+    // Create destination directory
+    if (!fs::exists(dst_directory)) {
+        if (!fs::create_directory(dst_directory)) {
+            throw std::runtime_error("Failed to create the destination directory: " + dst_directory);
         }
-        std::cout << "Destination folder was created\n";
+        std::cout << "Destination directory was created\n";
     } else {
-        std::cout << "Destination folder exists\n";
+        std::cout << "Destination directory exists\n";
     }
 
     // Process each file
     for (const std::string& file: files) {
         std::cout << "Process " << file << "\n";
-        Splitter splitter(file, dst_folder);
-        FileReader reader(FILENAME, [&splitter](const char* data, size_t len) { splitter.callback(data, len); }, MULTIPLE_INSTRUMENTS_HEADER);
-        run_reader(reader);
+        Splitter splitter(file, dst_directory);
+        FileReader reader(
+                MULTIPLE_INSTRUMENTS_TEST_FILENAME,
+                [&splitter](const char* data, size_t len) { splitter.CallBack(data, len); },
+                MULTIPLE_INSTRUMENTS_HEADER
+        );
+        RunReaderWithTimeCheck(reader);
     }
 
     return 0;

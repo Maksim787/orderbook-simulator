@@ -11,4 +11,7 @@ foreach (EXECUTABLE_RAW_NAME ${EXECUTABLES})
 
     # Link libraries
     target_link_libraries(${EXECUTABLE_NAME} PRIVATE orderbook-lib)
+
+    # Include common functions
+    target_include_directories(${EXECUTABLE_NAME} PRIVATE common)
 endforeach ()
